@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "netease-cloud-music-desktop",
+  "version": "0.1.0",
+  "identifier": "com.gitee.gmg137.NeteaseCloudMusicDesktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.png"],
+    "targets": ["deb", "appimage"],
+    "category": "Music",
+    "shortDescription": "网易云音乐桌面播放器",
+    "linux": {
+      "appimage": { "bundleMediaFramework": true },
+      "deb": {
+        "desktopTemplate": "linux.desktop.hbs",
+        "section": "sound",
+        "depends": ["libgstreamer1.0-0", "libgstreamer-plugins-extra1.0-0 | libgstreamer-plugins-bad1.0-0", "gstreamer1.0-plugins-good", "gstreamer1.0-plugins-base", "gstreamer1.0-libav", "libssl3 | libssl3t64"]
+      }
+    }
+  }
+}

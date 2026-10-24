@@ -1,0 +1,38 @@
+{
+  "provenance": {
+    "date": "2026-10-22",
+    "artifacts": "/tmp/opencode/ncm-native-soak",
+    "command": "G_DEBUG=fatal-criticals NCM_TEST_OUTPUT=/tmp/opencode/ncm-native-soak NCM_NATIVE_SOAK_SECONDS=7200 dbus-run-session -- python3 scripts/native-smoke.py",
+    "environment": "Ubuntu 26.04.1 / Xvfb / local WAV / GStreamer fakesink",
+    "build_scope": "Earlier native-smoke build, preceding final cache, search artwork and page restoration fixes; not the final release package.",
+    "measurement_scope": "Application and descendants only; excludes Xvfb and shared desktop services. Background statistics exclude the first 120 seconds and final 10 seconds. CPU percentage is relative to one logical core.",
+    "exit_code": 0
+  },
+  "result": "PASS",
+  "sampled_seconds": 7245.48,
+  "restore_ms": {
+    "min": 1057,
+    "median": 1059,
+    "max": 1061
+  },
+  "last_process_group_sample": {
+    "seconds": 7245.48,
+    "processes": 2,
+    "pss_kb": 149602,
+    "cpu_seconds": 75.22
+  },
+  "soak_seconds": 7200,
+  "soak_loops": 1197,
+  "background": {
+    "samples": 1415,
+    "process_counts": [2],
+    "pss_kib": {
+      "first": 147910,
+      "last": 149602,
+      "min": 136925,
+      "median": 148774,
+      "max": 149602
+    },
+    "mean_cpu_percent_one_core": 0.948
+  }
+}

@@ -1,0 +1,98 @@
+name: Desktop Tauri
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+      - run: bash scripts/install-deps-debian.sh
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: bash scripts/check.sh
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo build -p netease-cloud-music-desktop --features native-smoke,custom-protocol
+      - run: dbus-run-session -- python3 scripts/native-smoke.py
+        env:
+          NCM_TEST_OUTPUT: /tmp/ncm-native-smoke
+          G_DEBUG: fatal-criticals
+      - run: npm run tauri build -- --bundles deb --ci
+      - run: cargo install tauri-driver --locked
+      - run: dbus-run-session -- python3 scripts/native-webdriver.py
+        env:
+          NCM_TEST_OFFLINE: '1'
+          NCM_TEST_OUTPUT: /tmp/ncm-native-webdriver
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-linux-validation
+          path: |
+            target/release/bundle/deb/*.deb
+            test-results
+            /tmp/ncm-native-smoke
+            /tmp/ncm-native-webdriver
+  windows:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: x86_64-pc-windows-msvc
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: ilammy/setup-nasm@v1
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.40'
+          distribution: strawberry
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: windows-gstreamer-1.26.11
+      - run: ./scripts/install-gstreamer-windows.ps1
+      - run: ./scripts/stage-windows-runtime.ps1
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install chromium
+      - run: npm run test:e2e
+      - run: cargo test -p music-core --locked
+      - run: cargo test -p netease-cloud-music-desktop --locked
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo build -p netease-cloud-music-desktop --features native-smoke,custom-protocol --locked
+      - run: ./scripts/windows-smoke.ps1
+      - run: npm run tauri build -- --bundles nsis,msi --ci --target x86_64-pc-windows-msvc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-windows-validation
+          path: |
+            target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            test-results
+            ${{ env.NCM_WINDOWS_SMOKE_LOGS }}

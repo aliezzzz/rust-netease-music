@@ -1,0 +1,32 @@
+[package]
+name = "netease-cloud-music-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+native-smoke = []
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+music-core = { path = "../crates/music-core" }
+tauri = { version = "2", features = ["image-png"] }
+tauri-plugin-single-instance = "2"
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+log.workspace = true
+env_logger = "0.11"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni = "0.3"
+mpris-server = "0.9"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }

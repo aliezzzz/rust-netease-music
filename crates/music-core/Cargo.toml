@@ -1,0 +1,35 @@
+[package]
+name = "music-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["audio"]
+audio = ["dep:gstreamer", "dep:gstreamer-play"]
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+log.workspace = true
+fastrand = "2"
+dirs = "6"
+url = "2"
+regex = "1"
+md5 = "0.8"
+base64 = "0.22"
+cookie_store = "0.22"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+ncm-api = { git = "https://github.com/gmg137/netease-cloud-music-api.git", tag = "2.2.0", package = "netease-cloud-music-api" }
+gstreamer = { version = "0.21", optional = true }
+gstreamer-play = { version = "0.21", optional = true }
+
+# The API crate uses OpenSSL directly. Avoid requiring an external OpenSSL DLL
+# installation on Windows; build it into the Rust binary instead.
+[target.'cfg(windows)'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
+[dev-dependencies]
+tempfile = "3"

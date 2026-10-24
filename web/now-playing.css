@@ -1,0 +1,122 @@
+/* The expanded player owns its own contrast palette, independent of app theme. */
+.lyrics-view {
+  --text: #fff; --secondary: #ffffffb5; --muted: #ffffff80;
+  --surface: #29272e; --hover: #ffffff12; --border: #ffffff24;
+  --border-faint: #ffffff15; --accent: #fff; --accent-soft: #ffffff1c;
+  --player: #25232a; --scrollbar: #ffffff30;
+  position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none;
+  margin: 0; border: 0; padding: 0; color: var(--text); background: #26252c;
+  overflow: hidden; isolation: isolate; transform-origin: center bottom;
+}
+/* Keep the page beneath visible while the sheet travels to/from the player bar.
+   The dialog stays in the top layer until its exit animation has finished. */
+.lyrics-view[data-phase=opening], .lyrics-view[data-phase=closing] { will-change: transform, opacity; }
+.lyrics-view[data-phase=closing] { pointer-events: none; }
+.lyrics-view::backdrop { background: #0003; }
+.lyrics-view[data-phase=opening]::backdrop { animation: sheet-backdrop-in .44s ease both; }
+.lyrics-view[data-phase=closing]::backdrop { animation: sheet-backdrop-out .32s ease both; }
+@keyframes sheet-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+.lyrics-view:focus-visible { outline: none; }
+.lyrics-view:not([data-phase=open]) .album-sleeve,
+.lyrics-view:not([data-phase=open]) .lyric-copy,
+.lyrics-view:not([data-phase=open]) .lyric-lines > button { transition: none !important; }
+.album-background { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: radial-gradient(ellipse at 10% 10%, #625065, transparent 65%), radial-gradient(ellipse at 85% 80%, #314e5a, #29252d 80%); }
+.album-background-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; contain: strict; }
+.album-background-canvas.ready { opacity: 1; }
+.album-background-shade { position: absolute; inset: 0; background: linear-gradient(110deg, #17141b40, #13121c60), linear-gradient(0deg, #12111955, transparent 60%); }
+.lyrics-header { position: absolute; top: 0; left: 0; right: 0; height: 76px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; z-index: 3; }
+.lyrics-header .icon-button { width: 40px; height: 40px; border-radius: 50%; }
+.lyrics-header-label { font-size: 11px; letter-spacing: 3px; color: #ffffffa0; }
+.lyrics-header-label span { display: inline-block; margin-left: 12px; font-size: 9px; letter-spacing: 2px; opacity: .6; }
+.lyrics-layout { height: 100%; max-width: 1600px; margin: auto; display: grid; grid-template-columns: minmax(260px, .9fr) minmax(0, 1.25fr); align-items: center; gap: clamp(48px, 8vw, 140px); padding: 90px clamp(40px, 7vw, 120px) 48px; }
+.lyrics-song { min-width: 0; width: 100%; max-width: min(430px, 43vh); justify-self: center; }
+.album-sleeve { width: 100%; aspect-ratio: 1; transform: scale(.94); transition: transform .7s cubic-bezier(.22,1,.36,1); }
+.is-playing .album-sleeve { transform: scale(1); }
+.album-sleeve .cover { width: 100%; height: 100%; border-radius: 14px; background: linear-gradient(145deg, #ffffff20, #ffffff05); box-shadow: 0 24px 70px #0005, 0 2px 6px #0003; border: 1px solid #ffffff13; }
+.album-sleeve .cover > svg { color: #ffffff55; width: 25%; height: 25%; }
+.lyrics-metadata { display: flex; align-items: center; gap: 12px; margin-top: 28px; }
+.lyrics-metadata > div { flex: 1; min-width: 0; }
+.lyrics-metadata h2 { font-size: clamp(19px, 1.8vw, 26px); line-height: 1.35; letter-spacing: -.4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lyrics-metadata p { margin-top: 6px; font-size: 15px; color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lyrics-metadata span { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lyrics-view .transport { display: flex; flex-direction: column; margin-top: 22px; }
+.lyrics-view .timeline { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 0 0 18px; }
+.lyrics-view .timeline input { grid-column: 1 / -1; grid-row: 1; width: 100%; margin: 0; accent-color: #ffffffc9; }
+.lyrics-view .timeline span { font-size: 10px; }
+.lyrics-view .timeline span:last-child { text-align: right; }
+.lyrics-view .transport-buttons { justify-content: space-between; gap: 10px; }
+.lyrics-view .transport-buttons .icon-button { width: 40px; height: 44px; color: #fff; }
+.lyrics-view .transport-buttons .secondary { color: #ffffff80; }
+.lyrics-view .transport-buttons .secondary.active { color: #fff; background: #ffffff1c; }
+.lyrics-view .transport-buttons svg { width: 25px; height: 25px; }
+.lyrics-view .transport-buttons .secondary svg { width: 18px; height: 18px; }
+.lyrics-view .play-button { width: 54px; height: 54px; color: white; background: none; }
+.lyrics-view .play-button svg { width: 35px; height: 35px; }
+.lyrics-extras { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 15px; }
+.volume-control { display: flex; align-items: center; gap: 3px; }
+.lyrics-extras .volume-control { flex: 1; max-width: 200px; }
+.lyrics-extras .volume-button { display: inline-flex; }
+.lyrics-extras .volume-slider { display: block; width: 100%; min-width: 30px; accent-color: #ffffff90; }
+.lyrics-extras .quality-trigger { color: var(--secondary); border-color: #ffffff30; }
+.lyrics-extras .quality-popover { color: white; background: #29272ef5; }
+.lyrics-pane { height: 100%; min-height: 0; min-width: 0; }
+.lyrics-pane > .empty-state { height: 100%; }
+.lyrics-pane .empty-state p { font-size: 16px; color: #ffffffb0; }
+.lyrics-content { height: 100%; position: relative; min-height: 0; }
+.lyric-lines { position: relative; height: 100%; overflow-y: auto; padding: 40vh 12px; scrollbar-width: none; overscroll-behavior: contain; -webkit-mask-image: linear-gradient(transparent, black 12%, black 85%, transparent); mask-image: linear-gradient(transparent, black 12%, black 85%, transparent); }
+.lyric-lines::-webkit-scrollbar { display: none; }
+.lyric-lines > button { display: block; width: 100%; padding: 18px 0; text-align: left; font-size: clamp(28px, 3.1vw, 48px); font-weight: 750; line-height: 1.3; letter-spacing: -.6px; color: #ffffff50; overflow-wrap: anywhere; }
+.lyric-lines { overflow-anchor: none; }
+.lyric-lines > button { transform: translate3d(0, var(--lyric-y, 0px), 0); transition: color .45s ease, filter .5s ease; }
+.lyric-copy { display: block; transform: scale(.94); transform-origin: left center; transition: transform .75s cubic-bezier(.2,.8,.2,1.05), opacity .45s ease; }
+.lyric-lines > button.distant:not([data-offscreen=true]) { filter: blur(1.6px); }
+/* Keep measured space for native scrolling/accessibility, but skip screen-external paint. */
+.lyric-lines > button[data-offscreen=true] { content-visibility: hidden; filter: none; transform: none; }
+.lyric-lines > button:not([data-offscreen=true]) { contain: layout style; }
+.lyric-lines > button.past { color: #ffffff38; }
+.lyric-lines > button.active { color: white; filter: none; }
+.lyric-lines > button.active .lyric-copy { transform: scale(1); }
+.lyric-lines > button:hover, .lyric-lines > button:focus-visible { color: #ffffffc0; filter: none; }
+.simple-lyrics .lyric-lines > button, .browsing-lyrics .lyric-lines > button { filter: none; transform: none; }
+.simple-lyrics .lyric-copy, .browsing-lyrics .lyric-copy { transform: none; }
+.simple-lyrics .lyric-lines > button, .simple-lyrics .lyric-copy { transition: none; }
+.lyric-lines:focus-visible { outline-offset: -4px; }
+.lyric-lines small { display: block; margin-top: 12px; font-size: .45em; font-weight: 450; line-height: 1.5; color: inherit; opacity: .7; letter-spacing: 0; }
+.lyrics-reading-tools { position: absolute; bottom: 0; right: 0; left: 0; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
+.lyrics-reading-tools button { font-size: 11px; color: #ffffffa0; background: #1a172540; border-radius: 20px; padding: 8px 13px; }
+.lyric-mode-button:focus-visible { outline-color: #fff; }
+.lyrics-queue-overlay { position: absolute; inset: 76px 0 0; z-index: 5; background: #0002; }
+.lyrics-queue-overlay .queue-panel { position: absolute; top: 0; right: 20px; bottom: 20px; width: min(360px, calc(100% - 40px)); border: 1px solid #ffffff20; border-radius: 18px; background: #29272ef5; box-shadow: 0 20px 60px #0005; }
+@media (max-height: 680px) and (min-width: 701px) {
+  .lyrics-layout { padding-top: 64px; padding-bottom: 20px; }
+  .lyrics-song { max-width: min(340px, 38vh); }
+  .lyrics-metadata { margin-top: 15px; }
+  .lyrics-metadata h2 { font-size: 18px; }
+  .lyrics-metadata span { display: none; }
+  .lyrics-view .transport { margin-top: 14px; }
+  .lyrics-view .timeline { margin-bottom: 5px; }
+  .lyrics-extras { margin-top: 6px; }
+}
+@media (max-width: 700px) {
+  .lyrics-header { height: 56px; padding: 0 16px; }
+  .lyrics-header-label span { display: none; }
+  .lyrics-layout { padding: 68px 24px 20px; grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 16px; }
+  .lyrics-song { max-width: none; display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 0 18px; }
+  .album-sleeve { grid-column: 1; grid-row: 1; }
+  .album-sleeve .cover { border-radius: 9px; }
+  .lyrics-metadata { margin: 0; grid-column: 2; }
+  .lyrics-metadata h2 { font-size: 19px; }
+  .lyrics-metadata p { font-size: 12px; }
+  .lyrics-metadata span { font-size: 10px; }
+  .lyrics-view .transport { grid-column: 1 / -1; margin-top: 16px; }
+  .lyrics-view .timeline { margin-bottom: 3px; }
+  .lyrics-view .transport-buttons { justify-content: center; gap: 20px; }
+  .lyrics-extras { grid-column: 1 / -1; margin-top: 4px; }
+  .lyrics-extras .volume-control { max-width: 150px; }
+  .lyric-lines { padding-top: 20vh; padding-bottom: 30vh; }
+  .lyric-lines > button { font-size: 30px; }
+  .lyrics-queue-overlay { top: 56px; }
+}
+@media (prefers-reduced-motion: reduce) { .lyrics-view, .lyrics-view::backdrop, .lyrics-view * { animation: none !important; transition: none !important; } }
+.lyrics-view.reduced-motion, .lyrics-view.reduced-motion::backdrop, .lyrics-view.reduced-motion * { animation: none !important; transition: none !important; }
