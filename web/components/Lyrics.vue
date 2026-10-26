@@ -12,6 +12,7 @@ import VolumeControl from './VolumeControl.vue';
 import QueuePanel from './QueuePanel.vue';
 import AlbumBackground from './AlbumBackground.vue';
 import LyricStage from './LyricStage.vue';
+import WindowControls from './WindowControls.vue';
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ closed: [] }>();
 const lines = ref<Lyric[]>([]);
@@ -138,10 +139,11 @@ onUnmounted(() => {
 <template>
   <dialog ref="dialog" class="lyrics-view" :class="{ 'is-playing': playing, 'reduced-motion': reduced }" :data-phase="phase" aria-label="正在播放" @cancel.prevent="close" @keydown.esc="escape">
     <AlbumBackground :cover="current?.cover" :playing="playing" :reduced="reduced" :hidden="hidden" :suspended="suspended" />
-    <header class="lyrics-header">
+    <header class="lyrics-header" data-tauri-drag-region>
       <button ref="closeButton" class="icon-button lyrics-close" aria-label="关闭歌词" @click="close"><ChevronDown /></button>
-      <span class="lyrics-header-label">正在播放 <span>NOW PLAYING</span></span>
+      <span class="lyrics-header-label" data-tauri-drag-region="deep">正在播放 <span>NOW PLAYING</span></span>
       <button ref="queueButton" class="icon-button" :class="{ active: ui.queue }" aria-label="播放队列" :aria-pressed="ui.queue" @click="ui.queue = !ui.queue"><ListMusic /></button>
+      <WindowControls />
     </header>
     <div class="lyrics-layout">
       <section class="lyrics-song" aria-label="歌曲与播放控制">

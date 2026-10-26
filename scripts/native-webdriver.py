@@ -125,6 +125,10 @@ try:
     session = request('POST', '/session', {'capabilities': {'alwaysMatch': {'tauri:options': {'application': str(binary)}}}})['sessionId']
     request('POST', f'/session/{session}/timeouts', {'script': 30000, 'implicit': 1000})
     until(lambda: execute("return !!document.querySelector('.connection .online')"), 'real IPC initialization')
+    until(lambda: execute("return document.querySelectorAll('.topbar .window-controls button').length === 3"), 'custom titlebar controls')
+    if not isinstance(invoke('plugin:window|is_maximized', {'label': 'main'}), bool):
+        raise RuntimeError('Custom titlebar cannot read native window state')
+    screenshot('custom-titlebar.png')
     if live:
         until(lambda: execute("return document.querySelectorAll('.music-card').length > 0"), 'live discovery data')
         screenshot('discover.png')
@@ -193,6 +197,15 @@ try:
     tray_action('暂停')
     until(lambda: invoke('player_snapshot')['playback'] == 'paused', 'tray pause')
     tray_call(None, 'org.kde.StatusNotifierItem', 'Activate', GLib.Variant('(ii)', (0, 0)))
+    # The custom close button must use the existing save-and-destroy path,
+    # not quit the playback process. Activate recreates the main window.
+    ui_file = root / 'config/ui.json'
+    saved_at = ui_file.stat().st_mtime_ns if ui_file.exists() else 0
+    click('.topbar [aria-label="关闭窗口"]')
+    until(lambda: ui_file.exists() and ui_file.stat().st_mtime_ns > saved_at, 'custom close saves UI state')
+    if not Path(f'/proc/{app_pid}/exe').exists():
+        raise RuntimeError('Custom close unexpectedly quit the player')
+    tray_call(None, 'org.kde.StatusNotifierItem', 'Activate', GLib.Variant('(ii)', (0, 0)))
     # Verify actual queue and preferences remain persisted after orderly quit.
     # Exiting may terminate WebDriver before the final JS callback is delivered.
     try:
@@ -204,7 +217,7 @@ try:
         return not Path(f'/proc/{app_pid}/exe').exists()
     until(application_exited, 'application process exits')
     until(lambda: (root / 'config/state.json').exists() and json.loads((root / 'config/state.json').read_text())['settings']['theme'] == 'dark', 'shutdown persistence')
-    print('NATIVE_WEBDRIVER_OK: playback, queue, pause, MPRIS seek, settings, tray play/pause/activate/quit' + (', live discovery/search/covers/QR' if live else ''))
+    print('NATIVE_WEBDRIVER_OK: custom titlebar, close persistence/background process, playback, queue, pause, MPRIS seek, settings, tray play/pause/activate/quit' + (', live discovery/search/covers/QR' if live else ''))
     print('Artifacts:', output)
 finally:
     watcher.terminate()

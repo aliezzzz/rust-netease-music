@@ -11,12 +11,23 @@ test.beforeEach(async ({ page }) => {
     let state = { revision: 1, queue_revision: 1, queue: tracks.slice(0, 3), current_id: 1, playback: 'paused', position_ms: 12000, duration_ms: 180000, volume: .8, repeat: 'off', shuffle: false, continuous: { kind: 'none' }, error: null };
     const settings = { theme: 'light', quality: 'standard', volume: .8, mute_start: false, proxy: '', cache_days: 0, try_unavailable: false, desktop_lyrics: false, reduced_motion: true };
     let loggedIn = true; let subscribed = false;
+    let maximized = false;
+    const windowCommands: string[] = [];
     const likes = new Set<number>();
     const internals = {
       metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main', windowLabel: 'main' } },
       transformCallback(callback: (data: unknown) => void) { callbacks.set(++sequence, callback); return sequence; },
       unregisterCallback(id: number) { callbacks.delete(id); },
       async invoke(cmd: string, args: any = {}) {
+        if (cmd.startsWith('plugin:window|')) {
+          windowCommands.push(cmd);
+          if (cmd === 'plugin:window|is_maximized') return maximized;
+          if (cmd === 'plugin:window|toggle_maximize') maximized = !maximized;
+          if (cmd === 'plugin:window|close') {
+            callbacks.get(listeners.get('tauri://close-requested') ?? 0)?.({ event: 'tauri://close-requested', payload: null });
+          }
+          return;
+        }
         if (cmd === 'plugin:event|listen') { listeners.set(args.event, args.handler); return args.handler; }
         if (cmd === 'plugin:event|unlisten') return;
         if (cmd === 'player_snapshot') return structuredClone(state);
@@ -58,7 +69,7 @@ test.beforeEach(async ({ page }) => {
         }
       },
     };
-    Object.assign(window, { __TAURI_INTERNALS__: internals, __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener() {} } });
+    Object.assign(window, { isTauri: true, __windowCommands: windowCommands, __TAURI_INTERNALS__: internals, __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener() {} } });
   });
 });
 
@@ -583,4 +594,39 @@ test('long lyrics cull offscreen paint and restore rows when scrolling or resizi
     return Math.abs((active.top + active.height / 2 - el.getBoundingClientRect().top) / el.clientHeight - .44);
   })).toBeLessThan(.02);
   expect(await sheet.locator('[data-line]:not([data-offscreen=true])').count()).toBeLessThan(30);
+});
+
+test('integrated titlebar controls and close preserve native lifecycle', async ({ page }) => {
+  await page.goto('/');
+  const controls = page.locator('.topbar').getByRole('group', { name: '窗口控制' });
+  await expect(controls).toBeVisible();
+  await expect(page.locator('.topbar')).toHaveAttribute('data-tauri-drag-region', '');
+  await controls.getByRole('button', { name: '最大化窗口', exact: true }).click();
+  await expect(controls.getByRole('button', { name: '还原窗口' })).toBeVisible();
+  await controls.getByRole('button', { name: '还原窗口' }).click();
+  await expect(controls.getByRole('button', { name: '最大化窗口', exact: true })).toBeVisible();
+  await controls.getByRole('button', { name: '最小化窗口' }).click();
+  await page.getByRole('textbox', { name: '搜索音乐' }).fill('标题栏搜索');
+  await page.getByRole('textbox', { name: '搜索音乐' }).press('Enter');
+  await expect(page).toHaveURL(/search_song/);
+  await controls.getByRole('button', { name: '关闭窗口' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__windowCommands)).toContain('plugin:window|destroy');
+  const commands = await page.evaluate(() => (window as any).__windowCommands as string[]);
+  expect(commands).toContain('plugin:window|minimize');
+  expect(commands).toContain('plugin:window|close');
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-ui')!).route)).toContain('search_song');
+});
+
+test('window buttons fit at minimum width and remain available in lyrics', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 560 });
+  await page.goto('/');
+  const close = page.locator('.topbar').getByRole('button', { name: '关闭窗口' });
+  await expect(close).toBeInViewport();
+  const search = await page.getByRole('textbox', { name: '搜索音乐' }).boundingBox();
+  expect(search!.width).toBeGreaterThan(40);
+  await page.getByRole('button', { name: '打开歌词', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '正在播放' });
+  await expect(dialog.getByRole('button', { name: '关闭窗口' })).toBeInViewport();
+  await dialog.getByRole('button', { name: '最大化窗口', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '还原窗口' })).toBeVisible();
 });

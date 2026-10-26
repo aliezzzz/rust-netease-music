@@ -212,6 +212,7 @@ fn show_main_on_ui_thread(app: &tauri::AppHandle) {
     } else if let Err(error) =
         tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
             .title("网易云音乐")
+            .decorations(false)
             .inner_size(1280.0, 840.0)
             .min_inner_size(760.0, 560.0)
             .build()

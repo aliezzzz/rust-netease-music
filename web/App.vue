@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Search, Compass, ChartNoAxesCombined, Heart, CalendarDays, Radio, Cloud, Library, Disc3, Settings2, ChevronLeft, ChevronRight, UserRound, Music2, X, Trash2, ListMusic } from 'lucide-vue-next';
 import { initialize, ui, user, preferences, playback, command, call, notify } from './store';
 import PlayerBar from './components/PlayerBar.vue';
+import WindowControls from './components/WindowControls.vue';
 import Cover from './components/Cover.vue';
 const Lyrics = defineAsyncComponent(() => import('./components/Lyrics.vue'));
 import Login from './components/Login.vue';
@@ -109,10 +110,11 @@ onUnmounted(() => { dispose(); unclose(); document.removeEventListener('keydown'
       <div class="sidebar-bottom"><RouterLink to="/settings" @click="ui.lyrics = false"><Settings2 />设置</RouterLink><span class="connection"><i :class="{ online: ui.connected }"></i>{{ ui.connected ? '音乐，始终在线' : '等待播放核心' }}</span></div>
     </aside>
     <div class="workspace" :inert="lyricsBlocking" :aria-hidden="lyricsBlocking || undefined">
-      <header class="topbar">
+      <header class="topbar" data-tauri-drag-region>
         <div class="history"><button class="icon-button" aria-label="后退" @click="router.back()"><ChevronLeft /></button><button class="icon-button" aria-label="前进" @click="router.forward()"><ChevronRight /></button></div>
         <form class="search-box" role="search" @submit.prevent="doSearch"><Search /><input ref="input" v-model="search" aria-label="搜索音乐" placeholder="搜索歌曲、歌手、专辑" /><kbd>Ctrl K</kbd></form>
         <button class="account-button" @click="user ? router.push('/settings') : ui.login = true"><Cover v-if="user" :src="user.avatar_url" :size="64" round /><UserRound v-else /><span>{{ user?.nickname ?? '登录' }}</span></button>
+        <WindowControls />
       </header>
       <div class="body-panels">
         <main ref="scroll" class="content-scroll" @scroll.passive="recordScroll">
