@@ -27,6 +27,7 @@
 .album-background-shade { position: absolute; inset: 0; background: linear-gradient(110deg, #17141b40, #13121c60), linear-gradient(0deg, #12111955, transparent 60%); }
 .lyrics-header { position: absolute; top: 0; left: 0; right: 0; height: 76px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; z-index: 3; }
 .lyrics-header .icon-button { width: 40px; height: 40px; border-radius: 50%; }
+.lyrics-header .lyrics-close:focus-visible { outline: none; background: #ffffff12; }
 .lyrics-header-label { font-size: 11px; letter-spacing: 3px; color: #ffffffa0; }
 .lyrics-header-label span { display: inline-block; margin-left: 12px; font-size: 9px; letter-spacing: 2px; opacity: .6; }
 .lyrics-layout { height: 100%; max-width: 1600px; margin: auto; display: grid; grid-template-columns: minmax(260px, .9fr) minmax(0, 1.25fr); align-items: center; gap: clamp(48px, 8vw, 140px); padding: 90px clamp(40px, 7vw, 120px) 48px; }

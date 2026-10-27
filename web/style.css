@@ -140,7 +140,17 @@ kbd { font: 10px/1.5 inherit; font-size: 10px; padding: 2px 5px; border: 1px sol
 .context-menu button:hover { background: var(--hover); }
 .player-bar { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(190px, 1fr) minmax(250px, 1.35fr) minmax(180px, 1fr); align-items: center; gap: 24px; padding: 12px 24px; border-top: 1px solid var(--border); background: var(--player); z-index: 30; }
 .now-playing { display: flex; align-items: center; min-width: 0; gap: 12px; }
-.art-button { padding: 0; width: 54px; flex-shrink: 0; }
+.player-bar .art-button,
+.player-bar .art-button:focus,
+.player-bar .art-button:focus-visible {
+  padding: 0;
+  width: 54px;
+  flex-shrink: 0;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+.player-bar .art-button:focus-visible .cover { filter: brightness(.85); }
 .track-info { min-width: 0; }
 .track-info strong, .track-info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track-info strong { font-size: 12px; font-weight: 600; }
