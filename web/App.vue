@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Search, Compass, ChartNoAxesCombined, Heart, CalendarDays, Radio, Cloud, Library, Disc3, Settings2, ChevronLeft, ChevronRight, UserRound, Music2, X, Trash2, ListMusic } from 'lucide-vue-next';
 import { initialize, ui, user, preferences, playback, command, call, notify } from './store';
 import PlayerBar from './components/PlayerBar.vue';
+import logo from './assets/logo.png';
 import WindowControls from './components/WindowControls.vue';
 import Cover from './components/Cover.vue';
 const Lyrics = defineAsyncComponent(() => import('./components/Lyrics.vue'));
@@ -103,7 +104,7 @@ onUnmounted(() => { dispose(); unclose(); document.removeEventListener('keydown'
 <template>
   <div class="app-shell">
     <aside class="sidebar" :inert="lyricsBlocking" :aria-hidden="lyricsBlocking || undefined">
-      <RouterLink class="brand" to="/discover" @click="ui.lyrics = false"><span class="brand-mark"><Music2 /></span><span>云音乐<small>让喜欢，随时发生</small></span></RouterLink>
+      <RouterLink class="brand" to="/discover" @click="ui.lyrics = false"><img class="brand-mark" :src="logo" alt="" /><span>云音乐<small>让喜欢，随时发生</small></span></RouterLink>
       <nav aria-label="主要导航"><RouterLink v-for="item in links" :key="item.path" :to="item.path" @click="ui.lyrics = false"><component :is="item.icon" /><span>{{ item.label }}</span></RouterLink></nav>
       <div class="nav-label">我的音乐</div>
       <nav class="library-navigation" aria-label="资料库"><RouterLink v-for="item in library" :key="item.path" :to="item.path" @click="ui.lyrics = false"><component :is="item.icon" /><span>{{ item.label }}</span></RouterLink></nav>
