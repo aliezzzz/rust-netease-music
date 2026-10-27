@@ -9,6 +9,26 @@ struct Tray {
     core: Core,
     title: String,
     playing: bool,
+    icons: Vec<ksni::Icon>,
+}
+impl Tray {
+    fn show_main(&self) {
+        // The token is task-local to this tray/menu event. Looking it up later
+        // on Tauri's UI thread would lose the desktop's startup notification.
+        crate::show_main_with_activation(&self.app, ksni::current_xdg_activation_token());
+    }
+
+    fn without_window(&self, action: impl FnOnce(tauri::AppHandle, Core) + Send + 'static) {
+        let token = ksni::current_xdg_activation_token();
+        let app = self.app.clone();
+        let core = self.core.clone();
+        tauri::async_runtime::spawn(async move {
+            // Finish the desktop's launch feedback even though this action
+            // does not map a window. In particular, do this before app.exit().
+            super::startup::complete(&app, token).await;
+            action(app, core);
+        });
+    }
 }
 impl ksni::Tray for Tray {
     fn id(&self) -> String {
@@ -18,70 +38,63 @@ impl ksni::Tray for Tray {
         self.title.clone()
     }
     fn icon_name(&self) -> String {
-        "audio-x-generic".into()
+        // A theme name takes precedence over IconPixmap on many desktops.
+        // Leave it empty so the supplied artwork is actually used.
+        String::new()
     }
     fn icon_pixmap(&self) -> Vec<ksni::Icon> {
-        // A self-contained high-contrast music note, independent of the icon theme.
-        let mut data = Vec::with_capacity(32 * 32 * 4);
-        for y in 0..32i32 {
-            for x in 0..32i32 {
-                let note = ((19..22).contains(&x) && (7..23).contains(&y))
-                    || ((20..27).contains(&x) && (7..11).contains(&y))
-                    || ((x - 16).pow(2) + (y - 23).pow(2) < 25);
-                data.extend_from_slice(if note {
-                    &[255, 255, 255, 255]
-                } else {
-                    &[255, 188, 61, 89]
-                });
-            }
-        }
-        vec![ksni::Icon {
-            width: 32,
-            height: 32,
-            data,
-        }]
+        self.icons.clone()
     }
     fn activate(&mut self, _: i32, _: i32) {
-        crate::show_main(&self.app);
+        self.show_main();
     }
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         use ksni::{menu::StandardItem, MenuItem};
         vec![
             StandardItem {
                 label: self.title.clone(),
-                activate: Box::new(|s: &mut Self| crate::show_main(&s.app)),
+                activate: Box::new(|s: &mut Self| s.show_main()),
                 ..Default::default()
             }
             .into(),
             MenuItem::Separator,
             StandardItem {
                 label: "上一首".into(),
-                activate: Box::new(|s: &mut Self| dispatch(&s.core, Command::Previous)),
+                icon_name: "media-skip-backward-symbolic".into(),
+                activate: Box::new(|s: &mut Self| s.without_window(|_, core| dispatch(&core, Command::Previous))),
                 ..Default::default()
             }
             .into(),
             StandardItem {
                 label: if self.playing { "暂停" } else { "播放" }.into(),
-                activate: Box::new(|s: &mut Self| dispatch(&s.core, Command::Toggle)),
+                icon_name: if self.playing {
+                    "media-playback-pause-symbolic"
+                } else {
+                    "media-playback-start-symbolic"
+                }.into(),
+                activate: Box::new(|s: &mut Self| s.without_window(|_, core| dispatch(&core, Command::Toggle))),
                 ..Default::default()
             }
             .into(),
             StandardItem {
                 label: "下一首".into(),
-                activate: Box::new(|s: &mut Self| dispatch(&s.core, Command::Next)),
+                icon_name: "media-skip-forward-symbolic".into(),
+                activate: Box::new(|s: &mut Self| s.without_window(|_, core| dispatch(&core, Command::Next))),
                 ..Default::default()
             }
             .into(),
             MenuItem::Separator,
             StandardItem {
                 label: "打开主窗口".into(),
-                activate: Box::new(|s: &mut Self| crate::show_main(&s.app)),
+                icon_name: "window-new-symbolic".into(),
+                activate: Box::new(|s: &mut Self| s.show_main()),
                 ..Default::default()
             }
             .into(),
             StandardItem {
                 label: "退出".into(),
-                activate: Box::new(|s: &mut Self| crate::request_quit(&s.app)),
+                icon_name: "application-exit-symbolic".into(),
+                activate: Box::new(|s: &mut Self| s.without_window(|app, _| crate::request_quit(&app))),
                 ..Default::default()
             }
             .into(),
@@ -89,15 +102,21 @@ impl ksni::Tray for Tray {
     }
 }
 
-pub fn start(app: tauri::AppHandle, core: Core) {
+pub fn start(app: tauri::AppHandle, core: Core) -> anyhow::Result<()> {
     let tray = Tray {
         app: app.clone(),
         core: core.clone(),
         title: "网易云音乐".into(),
         playing: false,
+        icons: super::tray_icon::linux_icons()?,
     };
     let mut updates = core.subscribe();
     tauri::async_runtime::spawn(async move {
+        // The isolated native test has no desktop shell, but still exercises
+        // the real StatusNotifierItem activation methods over D-Bus.
+        let tray = tray.assume_sni_available(
+            cfg!(feature = "native-smoke") && std::env::var_os("NCM_NATIVE_SMOKE").is_some(),
+        );
         match tray.spawn().await {
             Ok(handle) => {
                 let mut last = (None, Playback::Stopped);
@@ -142,6 +161,7 @@ pub fn start(app: tauri::AppHandle, core: Core) {
             });
         })
         .expect("MPRIS thread");
+    Ok(())
 }
 
 async fn run_mpris(app: tauri::AppHandle, core: Core) -> anyhow::Result<()> {

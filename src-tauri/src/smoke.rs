@@ -23,6 +23,21 @@ pub fn start(app: tauri::AppHandle) {
                 },
             );
         }
+        #[cfg(target_os = "linux")]
+        if result.is_ok() {
+            // Exercise the actual menu Quit path while no window exists.
+            // The runner also checks the process exit status; PASS alone is
+            // not sufficient if notification cleanup stalls shutdown.
+            println!("TRAY_QUIT_BEGIN");
+            if let Err(error) = tray_event("ncm-smoke-quit", Some(8)).await {
+                eprintln!("TRAY_QUIT_FAILED: {error:#}");
+            } else {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                eprintln!("TRAY_QUIT_FAILED: process did not exit within 5 seconds");
+            }
+            app.exit(1);
+            return;
+        }
         let core = app.state::<Core>().inner().clone();
         let _ = core.command(Command::Shutdown).await;
         app.state::<crate::Lifecycle>()
@@ -144,6 +159,29 @@ async fn run(app: &tauri::AppHandle) -> Result<()> {
         "EOS auto-next without a window",
     )
     .await?;
+    #[cfg(target_os = "linux")]
+    {
+        tray_menu_icon(3, "media-skip-backward-symbolic").await?;
+        tray_menu_icon(5, "media-skip-forward-symbolic").await?;
+        tray_menu_icon(7, "window-new-symbolic").await?;
+        tray_menu_icon(8, "application-exit-symbolic").await?;
+        tray_menu_icon(4, "media-playback-pause-symbolic").await?;
+        tray_event("ncm-smoke-pause", Some(4)).await?;
+        until(|| core.snapshot().playback == Playback::Paused, "tray pause without UI").await?;
+        tray_menu_icon(4, "media-playback-start-symbolic").await?;
+        anyhow::ensure!(app.webview_windows().is_empty(), "tray pause opened a window");
+        tray_event("ncm-smoke-play", Some(4)).await?;
+        until(|| core.snapshot().playback == Playback::Playing, "tray play without UI").await?;
+        tray_menu_icon(4, "media-playback-pause-symbolic").await?;
+        anyhow::ensure!(app.webview_windows().is_empty(), "tray play opened a window");
+        tray_event("ncm-smoke-previous", Some(3)).await?;
+        until(|| core.snapshot().current_id == Some(1) && core.snapshot().playback == Playback::Playing, "tray previous without UI").await?;
+        tray_event("ncm-smoke-next", Some(5)).await?;
+        until(|| core.snapshot().current_id == Some(2) && core.snapshot().playback == Playback::Playing, "tray next without UI").await?;
+        anyhow::ensure!(app.webview_windows().is_empty(), "tray track change opened a window");
+        println!("TRAY_BACKGROUND_CONTROLS_OK");
+        println!("TRAY_MENU_ICONS_OK");
+    }
     core.command(Command::Mode {
         repeat: music_core::Repeat::One,
         shuffle: false,
@@ -183,6 +221,21 @@ async fn run(app: &tauri::AppHandle) -> Result<()> {
     )
     .await?;
     frontend(app, 100).await?;
+    #[cfg(target_os = "linux")]
+    {
+        // Tokens are distinct per event: verify existing and reconstructed
+        // windows, and both direct tray clicks and the open-window menu item.
+        tray_activation(app, "ncm-smoke-existing", false).await?;
+        app.get_webview_window("main").unwrap().close()?;
+        until(
+            || app.webview_windows().is_empty(),
+            "close before tray activation",
+        )
+        .await?;
+        tray_activation(app, "ncm-smoke-recreated", false).await?;
+        frontend(app, 102).await?;
+        tray_activation(app, "ncm-smoke-menu", true).await?;
+    }
     app.get_webview_window("main").unwrap().close()?;
     until(|| app.webview_windows().is_empty(), "close raised window").await?;
     tokio::task::spawn_blocking(|| -> Result<()> {
@@ -289,6 +342,110 @@ async fn run(app: &tauri::AppHandle) -> Result<()> {
     .await?;
     tokio::time::sleep(Duration::from_secs(3)).await;
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+async fn tray_menu_icon(id: u32, expected: &'static str) -> Result<()> {
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let dest = format!("org.kde.StatusNotifierItem-{}-1", std::process::id());
+        let start = Instant::now();
+        loop {
+            let out = std::process::Command::new("gdbus")
+                .args([
+                    "call", "--session", "--dest", &dest, "--object-path", "/MenuBar",
+                    "--method", "com.canonical.dbusmenu.GetProperty", &id.to_string(), "icon-name",
+                ])
+                .output()?;
+            if out.status.success() && String::from_utf8_lossy(&out.stdout).contains(expected) {
+                return Ok(());
+            }
+            anyhow::ensure!(start.elapsed() < Duration::from_secs(5), "tray icon {id} did not become {expected}");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }).await?
+}
+
+/// Xvfb verifies the token reaches the real GTK window, not just a mock.
+/// A real Wayland desktop is still needed to check the compositor's cursor.
+#[cfg(target_os = "linux")]
+async fn tray_event(token: &'static str, menu_id: Option<u32>) -> Result<()> {
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let dest = format!("org.kde.StatusNotifierItem-{}-1", std::process::id());
+        let call = |path: &str, method: &str, args: &[&str]| -> Result<()> {
+            let out = std::process::Command::new("gdbus")
+                .args([
+                    "call", "--session", "--dest", &dest, "--object-path", path,
+                    "--method", method,
+                ])
+                .args(args)
+                .output()?;
+            anyhow::ensure!(
+                out.status.success(),
+                "Tray {method}: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            Ok(())
+        };
+        call(
+            "/StatusNotifierItem",
+            "org.kde.StatusNotifierItem.ProvideXdgActivationToken",
+            &[token],
+        )?;
+        if let Some(id) = menu_id {
+            call(
+                "/MenuBar",
+                "com.canonical.dbusmenu.Event",
+                &[&id.to_string(), "clicked", "<0>", "0"],
+            )?;
+        } else {
+            call(
+                "/StatusNotifierItem",
+                "org.kde.StatusNotifierItem.Activate",
+                &["0", "0"],
+            )?;
+        }
+        Ok(())
+    })
+    .await?
+}
+
+#[cfg(target_os = "linux")]
+async fn tray_activation(app: &tauri::AppHandle, token: &'static str, menu: bool) -> Result<()> {
+    // Root=0; the open-main-window item is 7 (including separators).
+    tray_event(token, menu.then_some(7)).await?;
+    until(
+        || app.get_webview_window("main").is_some(),
+        "tray raises window",
+    )
+    .await?;
+    // xprop's name lookup depends on locale/WM_NAME encoding. Use an ASCII
+    // test-only title instead of the application's localized UTF-8 title.
+    let window = app
+        .get_webview_window("main")
+        .context("tray window missing")?;
+    window.set_title("NCM activation smoke")?;
+    let result = tokio::task::spawn_blocking(move || -> Result<()> {
+        let start = Instant::now();
+        loop {
+            let out = std::process::Command::new("xprop")
+                .args(["-name", "NCM activation smoke", "_NET_STARTUP_ID"])
+                .output()?;
+            if out.status.success() && String::from_utf8_lossy(&out.stdout).contains(token) {
+                println!("TRAY_ACTIVATION_OK: {token}");
+                return Ok(());
+            }
+            anyhow::ensure!(
+                start.elapsed() < Duration::from_secs(10),
+                "GTK startup ID missing for {token}: {} {}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    })
+    .await?;
+    window.set_title("网易云音乐")?;
+    result
 }
 
 #[cfg(target_os = "linux")]

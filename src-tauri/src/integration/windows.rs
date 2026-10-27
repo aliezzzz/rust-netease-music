@@ -1,4 +1,3 @@
-use anyhow::Context;
 use music_core::{Command, Core, Playback};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -33,7 +32,7 @@ pub fn start(app: tauri::AppHandle, core: Core) -> anyhow::Result<()> {
     )?;
     let commands = core.clone();
     let tray = TrayIconBuilder::with_id("music-player")
-        .icon(app.default_window_icon().context("缺少托盘图标")?.clone())
+        .icon(super::tray_icon::windows_icon()?)
         .tooltip("网易云音乐")
         .menu(&menu)
         .show_menu_on_left_click(false)

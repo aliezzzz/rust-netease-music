@@ -2,7 +2,11 @@
 """Run the opt-in native smoke binary against an isolated Xvfb display.
 
 Build first: cargo build -p netease-cloud-music-desktop --features native-smoke,custom-protocol
-Requires Xvfb and the regular application runtime libraries. No account is used.
+Run: dbus-run-session -- python3 scripts/native-smoke.py
+Requires Xvfb, gdbus, xprop and the regular application runtime libraries.
+Use a separate D-Bus session so the test cannot activate an existing app instance.
+No account is used. Token delivery is checked on X11; Wayland cursor feedback
+still needs a real-desktop check.
 """
 import json
 import math

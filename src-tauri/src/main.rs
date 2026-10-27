@@ -191,34 +191,58 @@ fn quit(app: tauri::AppHandle) {
 }
 
 pub fn show_main(app: &tauri::AppHandle) {
-    // Tray, MPRIS and second-instance callbacks may arrive on different threads.
-    // Serialize lookup+creation on the UI thread to avoid duplicate windows and
-    // WebView2 deadlocks; ignore requests once shutdown has started.
+    show_main_with_activation(app, None);
+}
+
+pub(crate) fn show_main_with_activation(app: &tauri::AppHandle, activation_token: Option<String>) {
+    // Capture tray tokens in the callback, before leaving ksni's event scope.
+    // Serialize lookup+creation and GTK activation on the UI thread.
     let handle = app.clone();
     if let Err(error) = app.run_on_main_thread(move || {
         if !handle.state::<Lifecycle>().quitting.load(Ordering::SeqCst) {
-            show_main_on_ui_thread(&handle);
+            show_main_on_ui_thread(&handle, activation_token.as_deref());
         }
     }) {
         log::error!("恢复主窗口失败: {error}");
     }
 }
 
-fn show_main_on_ui_thread(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-    } else if let Err(error) =
-        tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
+fn show_main_on_ui_thread(app: &tauri::AppHandle, activation_token: Option<&str>) {
+    let window = match app.get_webview_window("main") {
+        Some(window) => window,
+        None => {
+            let result = tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
             .title("网易云音乐")
             .decorations(false)
             .inner_size(1280.0, 840.0)
             .min_inner_size(760.0, 560.0)
-            .build()
-    {
-        log::error!("创建主窗口失败: {error}");
+            // A tray activation must reach GTK before the first map/present.
+            .visible(activation_token.is_none())
+            .build();
+            match result {
+                Ok(window) => window,
+                Err(error) => {
+                    log::error!("创建主窗口失败: {error}");
+                    return;
+                }
+            }
+        }
+    };
+    #[cfg(target_os = "linux")]
+    if let Some(token) = activation_token {
+        use gtk::prelude::GtkWindowExt;
+        match window.gtk_window() {
+            Ok(native) => native.set_startup_id(token),
+            Err(error) => log::warn!("设置窗口激活令牌失败: {error}"),
+        }
     }
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 pub fn request_quit(app: &tauri::AppHandle) {
@@ -294,7 +318,7 @@ fn main() {
                 }
             });
             integration::start(app.handle().clone(), core)?;
-            show_main_on_ui_thread(app.handle());
+            show_main_on_ui_thread(app.handle(), None);
             #[cfg(feature = "native-smoke")]
             if std::env::var_os("NCM_NATIVE_SMOKE").is_some() {
                 smoke::start(app.handle().clone());
